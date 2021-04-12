@@ -394,44 +394,14 @@
           <GroupName>Application/User/Core</GroupName>
           <Files>
             <File>
-              <FileName>groove_rgb.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\groove_rgb.h</FilePath>
-            </File>
-            <File>
-              <FileName>main.c</FileName>
+              <FileName>connectivity.c</FileName>
               <FileType>1</FileType>
-              <FilePath>../Core/Src/main.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f0xx_it.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../Core/Src/stm32f0xx_it.c</FilePath>
-            </File>
-            <File>
-              <FileName>stm32f0xx_hal_msp.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>../Core/Src/stm32f0xx_hal_msp.c</FilePath>
-            </File>
-            <File>
-              <FileName>main.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Core\Inc\main.h</FilePath>
-            </File>
-            <File>
-              <FileName>nrf24.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\Core\Inc\nrf24.h</FilePath>
-            </File>
-            <File>
-              <FileName>nrf24.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\Core\Src\nrf24.c</FilePath>
+              <FilePath>..\Core\Src\connectivity.c</FilePath>
             </File>
             <File>
               <FileName>connectivity.h</FileName>
               <FileType>5</FileType>
-              <FilePath>.\connectivity.h</FilePath>
+              <FilePath>..\Core\Inc\connectivity.h</FilePath>
             </File>
             <File>
               <FileName>graphics.c</FileName>
@@ -444,14 +414,59 @@
               <FilePath>..\Core\Inc\graphics.h</FilePath>
             </File>
             <File>
-              <FileName>map.h</FileName>
+              <FileName>groove_rgb.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\Core\Inc\map.h</FilePath>
+              <FilePath>.\groove_rgb.h</FilePath>
+            </File>
+            <File>
+              <FileName>keymap.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\keymap.c</FilePath>
+            </File>
+            <File>
+              <FileName>keymap.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Inc\keymap.h</FilePath>
+            </File>
+            <File>
+              <FileName>main.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/main.c</FilePath>
+            </File>
+            <File>
+              <FileName>main.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Inc\main.h</FilePath>
             </File>
             <File>
               <FileName>map.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\Core\Src\map.c</FilePath>
+            </File>
+            <File>
+              <FileName>map.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Inc\map.h</FilePath>
+            </File>
+            <File>
+              <FileName>nrf24.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\nrf24.c</FilePath>
+            </File>
+            <File>
+              <FileName>nrf24.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Inc\nrf24.h</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f0xx_it.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/stm32f0xx_it.c</FilePath>
+            </File>
+            <File>
+              <FileName>stm32f0xx_hal_msp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>../Core/Src/stm32f0xx_hal_msp.c</FilePath>
             </File>
           </Files>
         </Group>

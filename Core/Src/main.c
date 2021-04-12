@@ -1,5 +1,8 @@
 #include "main.h"
+#include "connectivity.h"
 #include "graphics.h"
+#include "map.h"
+#include "keymap.h"
 
 SPI_HandleTypeDef hspi1;
 I2C_HandleTypeDef hi2c1;
@@ -11,284 +14,161 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
 
-uint8_t nRF24_payload[32];
-
-// Pipe number
-nRF24_RXResult pipe;
-
-uint32_t i, j, k;
-
-// Length of received payload
-uint8_t payload_length;
-
-// Helpers for transmit mode demo
-
-// Timeout counter (depends on the CPU speed)
-// Used for not stuck waiting for IRQ
-#define nRF24_WAIT_TIMEOUT         (uint32_t)0x000FFFFF
-
-// Result of packet transmission
-typedef enum {
-    nRF24_TX_ERROR  = (uint8_t)0x00, // Unknown error
-    nRF24_TX_SUCCESS,                // Packet has been transmitted successfully
-    nRF24_TX_TIMEOUT,                // It was timeout during packet transmit
-    nRF24_TX_MAXRT                   // Transmit failed with maximum auto retransmit count
-} nRF24_TXResult;
-
-nRF24_TXResult tx_res;
-
-// Function to transmit data packet
-// input:
-//   pBuf - pointer to the buffer with data to transmit
-//   length - length of the data buffer in bytes
-// return: one of nRF24_TX_xx values
-nRF24_TXResult nRF24_TransmitPacket(uint8_t *pBuf, uint8_t length) {
-    volatile uint32_t wait = nRF24_WAIT_TIMEOUT;
-    uint8_t status;
-
-    // Deassert the CE pin (in case if it still high)
-    nRF24_CE_L();
-
-    // Transfer a data from the specified buffer to the TX FIFO
-    nRF24_WritePayload(pBuf, length);
-
-    // Start a transmission by asserting CE pin (must be held at least 10us)
-    nRF24_CE_H();
-
-    // Poll the transceiver status register until one of the following flags will be set:
-    //   TX_DS  - means the packet has been transmitted
-    //   MAX_RT - means the maximum number of TX retransmits happened
-    // note: this solution is far from perfect, better to use IRQ instead of polling the status
-    do {
-        status = nRF24_GetStatus();
-        if (status & (nRF24_FLAG_TX_DS | nRF24_FLAG_MAX_RT)) {
-            break;
-        }
-    } while (wait--);
-
-    // Deassert the CE pin (Standby-II --> Standby-I)
-    nRF24_CE_L();
-
-    if (!wait) {
-        // Timeout
-        return nRF24_TX_TIMEOUT;
-    }
-
-    // Clear pending IRQ flags
-    nRF24_ClearIRQFlags();
-
-    if (status & nRF24_FLAG_MAX_RT) {
-        // Auto retransmit counter exceeds the programmed maximum limit (FIFO is not removed)
-        return nRF24_TX_MAXRT;
-    }
-
-    if (status & nRF24_FLAG_TX_DS) {
-        // Successful transmission
-        return nRF24_TX_SUCCESS;
-    }
-
-    // Some banana happens, a payload remains in the TX FIFO, flush it
-    nRF24_FlushTX();
-
-    return nRF24_TX_ERROR;
-}
-
-
-void transmitter() {
-    // RX/TX disabled
-    nRF24_CE_L();
-	
-		HAL_Delay(100);
-
-    // Configure the nRF24L01+
-    while (!nRF24_Check()) {      
-			HAL_Delay(100);
-    }
-		
-    // Initialize the nRF24L01 to its default state
-    nRF24_Init();
-		
-		// This is simple transmitter (to one logic address):
-    //   - TX address: '0xE7 0x1C 0xE3'
-    //   - payload: 5 bytes
-    //   - RF channel: 115 (2515MHz)
-    //   - data rate: 250kbps (minimum possible, to increase reception reliability)
-    //   - CRC scheme: 2 byte
-
-    // The transmitter sends a 5-byte packets to the address '0xE7 0x1C 0xE3' without Auto-ACK (ShockBurst disabled)
-
-    // Disable ShockBurst for all RX pipes
-    nRF24_DisableAA(0xFF);
-
-    // Set RF channel
-    nRF24_SetRFChannel(115);
-
-    // Set data rate
-    nRF24_SetDataRate(nRF24_DR_250kbps);
-
-    // Set CRC scheme
-    nRF24_SetCRCScheme(nRF24_CRC_2byte);
-
-    // Set address width, its common for all pipes (RX and TX)
-    nRF24_SetAddrWidth(3);
-
-    // Configure TX PIPE
-    static const uint8_t nRF24_ADDR[] = { 0xE7, 0x1C, 0xE3 };
-    nRF24_SetAddr(nRF24_PIPETX, nRF24_ADDR); // program TX address
-
-    // Set TX power (maximum)
-    nRF24_SetTXPower(nRF24_TXPWR_0dBm);
-
-    // Set operational mode (PTX == transmitter)
-    nRF24_SetOperationalMode(nRF24_MODE_TX);
-
-    // Clear any pending IRQ flags
-    nRF24_ClearIRQFlags();
-
-    // Wake the transceiver
-    nRF24_SetPowerMode(nRF24_PWR_UP);
-
-
-    // The main loop
-//    int j = 0;
-//    int payload_length = 6;
-//		uint8_t payload[] = "Hello";
-//    while (1) {
-//       // Prepare data packet
-//			for (i = 0; i < payload_length; i++) {
-//    		nRF24_payload[i] = payload[i];
-
-//    	}
-
-//        // Transmit a packet
-//			tx_res = nRF24_TransmitPacket(nRF24_payload, payload_length);
-//        switch (tx_res) {
-//            case nRF24_TX_SUCCESS:
-//                break;
-//            case nRF24_TX_TIMEOUT:
-//                break;
-//            case nRF24_TX_MAXRT:
-//                break;
-//            default:
-//                break;
-//        }
-//				
-//        //HAL_Delay(1);
-//    }
-}
-
-void receiver() {
-    // RX/TX disabled
-    nRF24_CE_L();
-
-    if (!nRF24_Check()) {
-        while (1) { }
-    }
-
-    // Initialize the nRF24L01 to its default state
-    nRF24_Init();
-
-/***************************************************************************/
-
-    // This is simple receiver with one RX pipe:
-    //   - pipe#1 address: '0xE7 0x1C 0xE3'
-    //   - payload: 5 bytes
-    //   - RF channel: 115 (2515MHz)
-    //   - data rate: 250kbps (minimum possible, to increase reception reliability)
-    //   - CRC scheme: 2 byte
-
-    // The transmitter sends a 5-byte packets to the address '0xE7 0x1C 0xE3' without Auto-ACK (ShockBurst disabled)
-
-    // Disable ShockBurst for all RX pipes
-    nRF24_DisableAA(0xFF);
-
-    // Set RF channel
-    nRF24_SetRFChannel(115);
-
-    // Set data rate
-    nRF24_SetDataRate(nRF24_DR_250kbps);
-
-    // Set CRC scheme
-    nRF24_SetCRCScheme(nRF24_CRC_2byte);
-
-    // Set address width, its common for all pipes (RX and TX)
-    nRF24_SetAddrWidth(3);
-
-    // Configure RX PIPE#1
-    static const uint8_t nRF24_ADDR[] = { 0xE7, 0x1C, 0xE3 };
-    nRF24_SetAddr(nRF24_PIPE1, nRF24_ADDR); // program address for RX pipe #1
-    nRF24_SetRXPipe(nRF24_PIPE1, nRF24_AA_OFF, 5); // Auto-ACK: disabled, payload length: 5 bytes
-
-    // Set operational mode (PRX == receiver)
-    nRF24_SetOperationalMode(nRF24_MODE_RX);
-
-    // Wake the transceiver
-    nRF24_SetPowerMode(nRF24_PWR_UP);
-
-    // Put the transceiver to the RX mode
-    nRF24_CE_H();
-
-
-    // The main loop
-    while (1) {
-        //
-        // Constantly poll the status of the RX FIFO and get a payload if FIFO is not empty
-        //
-        // This is far from best solution, but it's ok for testing purposes
-        // More smart way is to use the IRQ pin :)
-        //
-        if (nRF24_GetStatus_RXFIFO() != nRF24_STATUS_RXFIFO_EMPTY) {
-            // Get a payload from the transceiver
-            pipe = nRF24_ReadPayload(nRF24_payload, &payload_length);
-
-            // Clear all pending IRQ flags
-            nRF24_ClearIRQFlags();
-
-						HAL_Delay(1);
-        }
-    }
-
-}
-
 void Init() {
-	HAL_Init();
-  SystemClock_Config();
-  MX_GPIO_Init();
-  MX_I2C1_Init();
-  MX_SPI1_Init();
-}
-
-void Check() {
+	HAL_Init(); //HAL bibliotekos inicializacija (Generuotas kodas)
+  SystemClock_Config(); //Sisteminio laikrodžio daugikliu nustatymas (Generuotas kodas) 
 	
+  MX_GPIO_Init(); //Mygtuku ir CE CSN pinu konfiguravimas
+  MX_I2C1_Init(); //I2C sasajos inicializacija skirta komunikacijai su matrica
+  MX_SPI1_Init(); //SPI sasajos inicializacija skirta komunikacijai su NRF24L01
 }
 
-void Connect() {
-}
+typedef enum {
+	ShipPlacement,
+	EnemyMap,
+	YourMap
+} GameState;
 
-void ReadUserInput() {
-	
-}
+typedef enum {
+	Turn_Yours,
+	Turn_Enemies,
+} Turn;
 
 int main(void)
 { 
   Init();
-	Check();
-	Connect();
-	SetBuffer();
-	DisplayBuffer();
+	HAL_Delay(250);
+	Turn turn = Turn_Yours;
+	SetAsReceiver();
 	
+	GameState gamestate = ShipPlacement;
+	
+	ship ship;
+	ship = GetNextShip();
+	SetTemporaryShipLocation(ship);	
+
+	
+	Shoot_Position data;
+
 
 	while(1) {
-		ReadUserInput();
+		data = ReceiveData();
+		if (data.enabled) {
+			AddLocalShot(data.x, data.y);
+			turn = Turn_Yours;
+		}		
 		
-		//Display();
-		for (int i=0; i<5; i++)
-		{
+		switch (gamestate) {
+			case ShipPlacement:
+			{
+				uint8_t keys_clicked = GetKeyClick();
+				ship = GetTemporaryShipLocation();
+				
+				if (keys_clicked & KC_Shoot) 
+				{
+					AddShip(ship);
+					ship = GetNextShip();
+					if (ship.enabled == 0)
+					{
+						gamestate = EnemyMap;
+						break;
+					}
+					SetTemporaryShipLocation(ship);	
+				}
 
-			DisplayEmoji(i, 1000, 0);
-			HAL_Delay(2000);
+				if (keys_clicked & KC_Alt) 
+				{
+					if (ship.orientation == vertical)
+						ship.orientation = horizontal;
+					else
+						ship.orientation = vertical;
+				}
+				
+				if (keys_clicked & KC_Left)	
+						ship.x--;
+					
+					if (keys_clicked & KC_Right)
+						ship.x++;
+					
+					if (keys_clicked & KC_Up)
+						ship.y--;
+					
+					if (keys_clicked & KC_Down)
+						ship.y++;
+				
+				SetTemporaryShipLocation(ship);		
+
+				
+				
+				PaintSea();
+				PaintShips();
+				PaintTempShip();
+				break;
+			}		
+			case EnemyMap:
+			{
+				uint8_t keys_clicked = GetKeyClick();
+				position cursor = GetCursor();
+				
+				if (keys_clicked & KC_Left)
+					cursor.x--;
+				
+				if (keys_clicked & KC_Right)
+					cursor.x++;
+				
+				if (keys_clicked & KC_Up)
+					cursor.y--;
+				
+				if (keys_clicked & KC_Down)
+					cursor.y++;
+				
+				if(cursor.x < 8 && cursor.y < 8)
+				{
+					SetCursor(cursor);
+					if (keys_clicked & KC_Shoot && turn == Turn_Yours)
+					{
+						Shoot_Position sp;
+						sp.enabled = 1;
+						sp.x = cursor.x;
+						sp.y = cursor.y;
+						SetAsTransmitter();
+						SendData(sp);
+						SetAsReceiver();
+						
+						AddShot(cursor.x, cursor.y, SH_Miss);
+						
+						//turn = Turn_Enemies;
+					}
+				}
+				
+				if (keys_clicked & KC_Alt)
+				{
+					gamestate = YourMap;
+				}
+					
+				PaintSea();
+				PaintDistantShots();
+				if(turn == Turn_Yours)
+					PaintCursor();
+			}
+			break;
+			case YourMap:
+			{
+				uint8_t keys_clicked = GetKeyClick();
+				if (keys_clicked & KC_Alt)
+				{
+					gamestate = EnemyMap;
+				}
+				
+				PaintSea();
+				PaintShips();
+				PaintLocalShots();
+				break;
+			}
 		}
 		
+		DisplayBuffer();	
+		HAL_Delay(100);
 	}
 	
 	//receiver();
@@ -342,7 +222,7 @@ void SystemClock_Config(void) {
   */
 static void MX_I2C1_Init(void) {
   hi2c1.Instance = I2C1;
-  hi2c1.Init.Timing = 0x2000090E;
+  hi2c1.Init.Timing = 0x2000090E; //100kHz
   hi2c1.Init.OwnAddress1 = 0;
   hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
@@ -404,10 +284,10 @@ static void MX_GPIO_Init(void) {
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, CE_nRF_Pin|CSN_nRF_Pin|LD4_Pin|LD3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, CE_nRF_Pin|CSN_nRF_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : CE_nRF_Pin CSN_nRF_Pin LD4_Pin LD3_Pin */
-  GPIO_InitStruct.Pin = CE_nRF_Pin|CSN_nRF_Pin|LD4_Pin|LD3_Pin;
+  GPIO_InitStruct.Pin = CE_nRF_Pin|CSN_nRF_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -422,7 +302,7 @@ static void MX_GPIO_Init(void) {
   /*Configure GPIO pins : Mygtukas_1_Pin Mygtukas_2_Pin Mygtukas_3_Pin Mygtukas_4_Pin
                            Mygtukas_5_Pin */
   GPIO_InitStruct.Pin = Mygtukas_1_Pin|Mygtukas_2_Pin|Mygtukas_3_Pin|Mygtukas_4_Pin
-                          |Mygtukas_5_Pin;
+                          |Mygtukas_5_Pin|Mygtukas_6_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -456,6 +336,25 @@ uint8_t nRF24_LL_RW(uint8_t reg) {
 	}
 	
 	return result;
+}
+
+//   count - number of bytes to read
+void nRF24_LL_RW_MB(uint8_t reg, uint8_t *pBuf, uint8_t count) {
+	nRF24_CSN_L();
+	
+	uint8_t tx[32] = { reg, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,0xFF, 0xFF};
+	uint8_t rx[32] = {0};
+	
+	if (HAL_SPI_TransmitReceive(&hspi1, tx, rx, count, 10) != HAL_OK)
+	{
+		print_error("Error reading Register: %i", (char*)hspi1.ErrorCode);
+	}
+	for(int i=0;i<count;i++)
+	{
+		*pBuf++ = rx[i];
+	}	
+	
+	nRF24_CSN_H();
 }
 
 

@@ -45,7 +45,7 @@ static void nRF24_WriteReg(uint8_t reg, uint8_t value) {
 static void nRF24_ReadMBReg(uint8_t reg, uint8_t *pBuf, uint8_t count) {
 	nRF24_CSN_L();
 	nRF24_LL_RW(reg);
-	while (count--) {
+	while (count--) {		
 		*pBuf++ = nRF24_LL_RW(nRF24_CMD_NOP);
 	}
 	nRF24_CSN_H();
@@ -86,6 +86,8 @@ void nRF24_Init(void) {
 	nRF24_WriteReg(nRF24_REG_DYNPD, 0x00);
 	nRF24_WriteReg(nRF24_REG_FEATURE, 0x00);
 
+	HAL_Delay(100);
+	
 	// Clear the FIFO's
 	nRF24_FlushRX();
 	nRF24_FlushTX();
@@ -95,6 +97,7 @@ void nRF24_Init(void) {
 
 	// Deassert CSN pin (chip release)
 	nRF24_CSN_H();
+	HAL_Delay(100);
 }
 
 // Check if the nRF24L01 present
@@ -108,6 +111,7 @@ uint8_t nRF24_Check(void) {
 
 	// Write test TX address and read TX_ADDR register
 	nRF24_WriteMBReg(nRF24_CMD_W_REGISTER | nRF24_REG_TX_ADDR, ptr, 5);
+	//nRF24_LL_RW_MB(nRF24_CMD_R_REGISTER | nRF24_REG_TX_ADDR, rxbuf, 5);
 	nRF24_ReadMBReg(nRF24_CMD_R_REGISTER | nRF24_REG_TX_ADDR, rxbuf, 5);
 
 	// Compare buffers, return error on first mismatch

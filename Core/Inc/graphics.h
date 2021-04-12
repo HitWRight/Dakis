@@ -11,6 +11,6 @@ HAL_StatusTypeDef DisplayEmoji(uint8_t emoji, uint16_t duration_time, char forev
 //Ptr size must be 64
 void DisplayBuffer(void);
 
-void SetBuffer(void);
+void PaintTiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t color);
 
 #endif

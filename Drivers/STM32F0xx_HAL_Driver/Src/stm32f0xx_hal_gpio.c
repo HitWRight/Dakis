@@ -187,8 +187,10 @@ void HAL_GPIO_Init(GPIO_TypeDef  *GPIOx, GPIO_InitTypeDef *GPIO_Init)
   assert_param(IS_GPIO_PULL(GPIO_Init->Pull));
 
   /* Configure the port pins */
+
   while (((GPIO_Init->Pin) >> position) != 0x00u)
   {
+		uint32_t pinPos = ((GPIO_Init->Pin) >> position);
     /* Get current io position */
     iocurrent = (GPIO_Init->Pin) & (1uL << position);
 

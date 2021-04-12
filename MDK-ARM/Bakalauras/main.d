@@ -32,4 +32,8 @@ bakalauras\main.o: ../Drivers/STM32F0xx_HAL_Driver/Inc/stm32f0xx_hal_spi.h
 bakalauras\main.o: ../Drivers/STM32F0xx_HAL_Driver/Inc/stm32f0xx_hal_spi_ex.h
 bakalauras\main.o: ../Core/Inc/nrf24.h
 bakalauras\main.o: ../Core/Inc/main.h
+bakalauras\main.o: ../Core/Inc/connectivity.h
+bakalauras\main.o: ../Core/Inc/nrf24.h
 bakalauras\main.o: ../Core/Inc/graphics.h
+bakalauras\main.o: ../Core/Inc/map.h
+bakalauras\main.o: ../Core/Inc/keymap.h

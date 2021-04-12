@@ -1,6 +1,6 @@
 #include "graphics.h"
 
-const uint16_t GROVE_TWO_RGB_LED_MATRIX_DEF_I2C_ADDR = 0x65 << 1; //Leftshift due to STM32
+const uint16_t GROVE_TWO_RGB_LED_MATRIX_DEF_I2C_ADDR = 0x65 << 1; //Poslinkis bit'o i kaire nes to nedaro HAL biblioteka automatiskai
 uint8_t _buffer[8][8];
 
 //Ptr size must be 4
@@ -28,20 +28,21 @@ HAL_StatusTypeDef GetDeviceId(uint8_t *data)
 HAL_StatusTypeDef DisplayEmoji(uint8_t emoji, uint16_t duration_time, char forever_flag) 
 {
     I2C_HandleTypeDef hnd = GetI2CHandle();
-		const char I2C_CMD_DISP_EMOJI = 2;
 	
     uint8_t data[5] = {0, };
 
-  	data[0] = 0x02; //I2C_CMD_DISP_CUSTOM
-    data[1] = emoji;
-    data[2] = (uint8_t)(duration_time & 0xff);
-    data[3] =  (uint8_t)((duration_time >> 8) & 0xff);
-    data[4] = forever_flag;
+  	data[0] = 0x02; //I2C_CMD_DISP_EMOJI
+    data[1] = emoji; //emojiID
+    data[2] = (uint8_t)(duration_time & 0xff); //duration time low
+    data[3] = (uint8_t)((duration_time >> 8) & 0xff); //duration time high
+    data[4] = forever_flag; // forever flag
 	
 		HAL_StatusTypeDef ret = HAL_I2C_Master_Transmit(&hnd, GROVE_TWO_RGB_LED_MATRIX_DEF_I2C_ADDR, data, 5, 20);
 
 		return ret;
 }
+
+
 
 void DisplayBuffer() {
 	I2C_HandleTypeDef hnd = GetI2CHandle();
@@ -51,6 +52,7 @@ void DisplayBuffer() {
   data[2] = 0x0; //duration time high bits
   data[3] = 0x1; //forever_flag
   data[4] = 0x1; //frames number
+	
 	data[5] = 0x0; //frameID
 	
 	//Copy buffer info
@@ -72,63 +74,42 @@ void DisplayBuffer() {
 	data_ptr--;
 	data_ptr[0] = 0x81;
 	HAL_I2C_Master_Transmit(&hnd, GROVE_TWO_RGB_LED_MATRIX_DEF_I2C_ADDR, data_ptr, 25, HAL_MAX_DELAY);
-	
 }
 
+
 void SetBuffer() {
-	for (int j = 0; j < 64; j++) {
-		_buffer[j/8][j%8] = 0xa7;
-		if (j/8 == 3 && j%8 > 3 && j%8 < 7) {
-			_buffer[j/8][j%8] = 0x5b;
+	for (int y = 0; y <= 7; y++)
+	{	
+		for (int x = 0; x <= 7; x++)
+		{
+			_buffer[y][x] = 0xa7; //juros spalva (melyna)
+			
+			if (y == 3 && x > 3 && x < 7) {
+				_buffer[y][x] = 0x5b; //laivo spalva (zalia)
+			}
+			
+			if (y < 4 && x == 2) {
+				_buffer[y][x] = 0x5b; //laivo spalva (zalia)
+			}
+				
+			if (y == 1 && x > 1 && x < 7) {
+				_buffer[y][x] = 0xff; //suvio vietos spalva (juoda (nedega))
+			}
+			
+			if (y == 1 && x == 2) {
+				_buffer[y][x] = 0x01; //pataikyto laivo spalva (raudona)
+			}
 		}
-		
-		if (j/8 == 1 && j%8 > 1 && j%8 < 7) {
-			_buffer[j/8][j%8] = 0xff;
-		}
-		
-		if (j/8 < 4 && j%8 == 2) {
-			_buffer[j/8][j%8] = 0x5b;
-		}
-		
-		if (j/8 == 1 && j%8 == 2) {
-			_buffer[j/8][j%8] = 0x01;
-		}
-		
-	
 	}
 }
 
-//void GroveTwoRGBLedMatrixClass::displayFrames(uint8_t* buffer, uint16_t duration_time, bool forever_flag,
-//        uint8_t frames_number) {
-//    uint8_t data[72] = {0, };
-//    // max 5 frames in storage
-//    if (frames_number > 5) {
-//        frames_number = 5;
-//    } else if (frames_number == 0) {
-//        return;
-//    }
-
-//    data[0] = I2C_CMD_DISP_CUSTOM;
-//    data[1] = 0x0;
-//    data[2] = 0x0;
-//    data[3] = 0x0;
-//    data[4] = frames_number;
-
-//    for (int i = frames_number - 1; i >= 0; i--) {
-//        data[5] = i;
-//        for (int j = 0; j < 64; j++) {
-//            data[8 + j] = buffer[j + i * 64];
-//        }
-//        if (i == 0) {
-//            // display when everything is finished.
-//            data[1] = (uint8_t)(duration_time & 0xff);
-//            data[2] = (uint8_t)((duration_time >> 8) & 0xff);
-//            data[3] = forever_flag;
-//        }
-//        i2cSendBytes(currentDeviceAddress, data, 24);
-//        delay(1);
-//        i2cSendContinueBytes(currentDeviceAddress, data + 24, 24);
-//        delay(1);
-//        i2cSendContinueBytes(currentDeviceAddress, data + 48, 24);
-//    }
-// 
+void PaintTiles(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t color)
+{
+	for (int xx = x; xx<x+w; xx++)
+	{
+		for (int yy = y; yy<y+h; yy++) 
+		{
+			_buffer[yy][xx] = color;
+		}
+	}
+}
